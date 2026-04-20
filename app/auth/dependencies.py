@@ -14,7 +14,7 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """
-    Reusable dependency: extracts and verifies the JWT token,
+    Extracts and verifies the JWT token,
     then fetches the corresponding user from the database.
     Raises 401 if token is missing, invalid, or expired.
     """
@@ -41,11 +41,7 @@ def get_current_user(
 
 def require_role(*allowed_roles: UserRole):
     """
-    Reusable RBAC dependency factory.
-    Usage: Depends(require_role(UserRole.admin))
-
-    Role checks are enforced HERE — not hardcoded per route.
-    This satisfies the assignment's RBAC constraint.
+    Role checks are enforced HERE
     """
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:

@@ -14,8 +14,8 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     """
     Register a new user.
-    - Hashes the password before saving (never stored in plain text).
-    - Assigns the role from the request (defaults to 'user').
+    Hashes the password before saving.
+    Assigns the role from the request (defaults to 'user').
     """
     # Check for duplicate username
     if db.query(User).filter(User.username == payload.username).first():
@@ -46,7 +46,6 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     """
     Authenticate a user and return a JWT token.
-    - Token is signed with HS256 and includes username (sub), role, and expiry.
     """
     user = db.query(User).filter(User.username == payload.username).first()
 

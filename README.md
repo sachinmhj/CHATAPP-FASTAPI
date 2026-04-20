@@ -1,213 +1,71 @@
-# 💬 Chat App — Backend Developer Assignment
+# 💬 Chat Application Backend
 
 A real-time chat application backend built with **Python**, **FastAPI**, and **PostgreSQL**.
 
 ---
 
-## 🚀 Tech Stack
+## 🚀 Getting Started
 
-| Layer | Technology |
-|---|---|
-| Framework | FastAPI |
-| Server | Uvicorn (ASGI) |
-| ORM | SQLAlchemy |
-| Database | PostgreSQL |
-| Auth | JWT (python-jose) + bcrypt (passlib) |
-| Real-time | WebSockets (FastAPI native) |
+Follow these steps to set up and run the project locally on your machine.
 
----
+### 1. Prerequisites
+Ensure you have the following installed:
+- **Python 3.10+**
+- **PostgreSQL**
+- **Git**
 
-## 📦 Project Structure
-
-```
-chat-app/
-├── app/
-│   ├── main.py              # FastAPI entry point
-│   ├── database.py          # SQLAlchemy engine + session
-│   ├── models.py            # DB models: User, Room, Message
-│   ├── schemas.py           # Pydantic request/response schemas
-│   ├── auth/
-│   │   ├── router.py        # POST /auth/signup, /auth/login
-│   │   ├── utils.py         # Password hashing + JWT creation
-│   │   └── dependencies.py  # Reusable RBAC dependency
-│   ├── chat/
-│   │   └── router.py        # WebSocket /ws/{room_id}
-│   └── rooms/
-│       └── router.py        # Room CRUD + message history
-├── .env                     # Local secrets (NOT committed)
-├── .env.example             # Env template (safe to commit)
-├── requirements.txt
-└── README.md
-```
-
----
-
-## ⚙️ How to Run Locally
-
-### 1. Clone the repository
+### 2. Clone the Repository
 ```bash
-git clone https://github.com/sachinmhj/chat-app.git
-cd chat-app
+git clone https://github.com/sachinmhj/CHATAPP-FASTAPI.git
+cd CHATAPP-FASTAPI
 ```
 
-### 2. Create and activate virtual environment
+### 3. Set Up Virtual Environment
 ```bash
 python3 -m venv venv
-source venv/bin/activate        # macOS / Linux
-# venv\Scripts\activate         # Windows
+source venv/bin/activate
 ```
 
-### 3. Install dependencies
+### 4. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Set up PostgreSQL database
+### 5. Database Setup
+Create a new PostgreSQL database:
 ```bash
 createdb chatapp
 ```
 
-### 5. Configure environment variables
+### 6. Environment Configuration
+Create a `.env` file in the root directory and add your configuration. You can use the template below:
 ```bash
 cp .env.example .env
-# Then edit .env and fill in your real DATABASE_URL and SECRET_KEY
 ```
+Update the `DATABASE_URL` in `.env` to match your local PostgreSQL credentials:
+`DATABASE_URL=postgresql://<user>@localhost:5432/chatapp`
 
-Your `.env` should look like:
-```
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/chatapp
-SECRET_KEY=your-super-secret-key
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-```
-
-### 6. Start the server
+### 7. Run the Application
+Start the Uvicorn server:
 ```bash
 uvicorn app.main:app --reload
 ```
 
-> The app will automatically create all database tables on first run.
+---
 
-### 7. Open the interactive API docs
-```
-http://localhost:8000/docs
-```
+## 📡 API Documentation
+Once the server is running, you can access the interactive Swagger documentation at:
+👉 **[http://localhost:8000/docs](http://localhost:8000/docs)**
+
+### Key Endpoints:
+- **Auth**: `/auth/signup`, `/auth/login`, `/auth/me`
+- **Rooms**: `/rooms/` (Create and List rooms)
+- **Chat**: `/ws/{room_id}` (WebSocket real-time chat)
 
 ---
 
-## 📡 API Endpoints
-
-### Authentication
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| POST | `/auth/signup` | ❌ | Register a new user |
-| POST | `/auth/login` | ❌ | Login and get JWT token |
-| GET | `/auth/me` | ✅ Any user | Get current user info |
-| GET | `/auth/admin-only` | ✅ Admin only | RBAC demo endpoint |
-
-### Rooms
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| POST | `/rooms/` | ✅ Admin only | Create a new room |
-| GET | `/rooms/` | ✅ Any user | List all rooms |
-| GET | `/rooms/{room_id}` | ✅ Any user | Get room details |
-| GET | `/rooms/{room_id}/messages` | ✅ Any user | Get message history (cursor-paginated) |
-
-### WebSocket
-| Protocol | Endpoint | Description |
-|---|---|---|
-| WS | `/ws/{room_id}?token=<jwt>` | Real-time chat |
-
----
-
-## 🔌 WebSocket Usage
-
-Connect using any WebSocket client:
-```
-ws://localhost:8000/ws/1?token=<your_jwt_token>
-```
-
-**On connect** — you receive recent message history:
-```json
-{
-  "type": "history",
-  "messages": [...],
-  "room": { "id": 1, "name": "General" }
-}
-```
-
-**Send a message** — just send plain text:
-```
-Hello everyone!
-```
-
-**Broadcast received by all clients in the room:**
-```json
-{
-  "type": "message",
-  "id": 42,
-  "content": "Hello everyone!",
-  "username": "sachin",
-  "timestamp": "2026-04-20T06:30:00",
-  "room_id": 1
-}
-```
-
----
-
-## 📄 Cursor-Based Pagination
-
-Message history uses **cursor-based pagination** (not offset).
-
-**Why cursor over offset?**
-- OFFSET is unstable — new messages shift pages on re-query
-- Cursor (`WHERE id < cursor`) is stable, predictable, and faster at scale
-
-**Usage:**
-```
-# First page (latest 20 messages)
-GET /rooms/1/messages?limit=20
-
-# Next page (pass the lowest ID from the previous response as cursor)
-GET /rooms/1/messages?limit=20&cursor=150
-```
-
----
-
-## 🔐 Security Design
-
-| Concern | Approach |
-|---|---|
-| Password storage | bcrypt hashed via `passlib` — never stored plain |
-| JWT signing | HS256 with expiry embedded in token |
-| RBAC | Reusable `require_role()` dependency — not hardcoded per route |
-| WebSocket auth | JWT passed as query param, connection rejected (code 1008) if invalid |
-| Unauthenticated access | All routes except `/auth/signup` and `/auth/login` require a valid token |
-
----
-
-## 🧩 Group B Choice — PostgreSQL Persistence & Data Modelling
-
-I chose **Task 1: PostgreSQL Persistence & Data Modelling** because:
-
-1. **Natural overlap** — The models (User, Room, Message) are required by Group A anyway, so building them fully is a no-brainer.
-2. **Demonstrates database depth** — Proper FK constraints, ORM relationships, and cursor pagination show real backend knowledge.
-3. **Cursor pagination is production-grade** — Unlike offset pagination, cursor-based is used in real systems (Slack, Discord) because it doesn't shift on new data.
-
-### Models
-- **User** → `id, username, email, hashed_password, role`
-- **Room** → `id, name, description, created_at`
-- **Message** → `id, content, timestamp, user_id (FK), room_id (FK)`
-
-All foreign key constraints are enforced at the **database level** via SQLAlchemy's `ForeignKey()`.
-
----
-
-## ✅ Submission Checklist
-
-- [x] Project runs from a fresh clone with no errors
-- [x] `.env.example` included (no real secrets)
-- [x] All Group A tasks complete (env, JWT auth, WebSocket)
-- [x] One Group B task complete (PostgreSQL persistence + cursor pagination)
-- [x] README explains how to run the project locally
-- [x] Code is clean, readable, and consistently formatted
+## 🔌 WebSocket Testing
+To test the real-time chat:
+1. Obtain a JWT token via `/auth/login`.
+2. Connect to the WebSocket using a client like Postman or the browser:
+   `ws://localhost:8000/ws/{room_id}?token=YOUR_JWT_TOKEN`
