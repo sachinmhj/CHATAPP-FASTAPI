@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App Tester</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; display: flex; flex-direction: column; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .controls { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; display: grid; gap: 10px; }
+        input { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        button { padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+        button:hover { background: #0056b3; }
+        button.disconnect { background: #dc3545; }
+        #chat-window { flex-grow: 1; background: white; border-radius: 12px; padding: 20px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 10px; }
+        .message { padding: 10px 14px; border-radius: 18px; max-width: 80%; line-height: 1.4; font-size: 14px; }
+        .message.system { align-self: center; background: #e9ecef; color: #6c757d; font-style: italic; border-radius: 8px; }
+        .message.incoming { align-self: flex-start; background: #f1f0f0; color: #333; }
+        .message.outgoing { align-self: flex-end; background: #007bff; color: white; }
+        .input-area { margin-top: 20px; display: flex; gap: 10px; }
+        .input-area input { flex-grow: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <input type="text" id="token" placeholder="Paste JWT Token here">
+        <input type="number" id="room_id" placeholder="Room ID (e.g. 1)" value="1">
+        <button id="connect-btn" onclick="connect()">Connect to Chat</button>
+    </div>
+
+    <div id="chat-window">
+        <div class="message system">Not connected. Please enter token and click Connect.</div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="msg-input" placeholder="Type a message..." onkeypress="handleKey(event)" disabled>
+        <button id="send-btn" onclick="sendMessage()" disabled>Send</button>
+    </div>
+
+    <script>
+        let ws;
+        const chatWindow = document.getElementById('chat-window');
+        const msgInput = document.getElementById('msg-input');
+        const sendBtn = document.getElementById('send-btn');
+        const connectBtn = document.getElementById('connect-btn');
+
+        function appendMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = text;
+            chatWindow.appendChild(div);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value;
+            const roomId = document.getElementById('room_id').value;
+
+            if (!token) return alert("Please paste your JWT token first!");
+
+            const url = `ws://localhost:8000/ws/${roomId}?token=${token}`;
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                appendMessage("Connected to room " + roomId, "system");
+                msgInput.disabled = false;
+                sendBtn.disabled = false;
+                connectBtn.textContent = "Disconnect";
+                connectBtn.className = "disconnect";
+                connectBtn.onclick = disconnect;
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === "history") {
+                    data.messages.forEach(m => {
+                        appendMessage(`${m.username}: ${m.content}`, "incoming");
+                    });
+                } else if (data.type === "message") {
+                    appendMessage(`${data.username}: ${data.content}`, "incoming");
+                } else if (data.type === "system") {
+                    appendMessage(data.message, "system");
+                }
+            };
+
+            ws.onclose = () => {
+                appendMessage("Disconnected from server.", "system");
+                resetUI();
+            };
+
+            ws.onerror = (err) => {
+                appendMessage("Connection error. Check console.", "system");
+                console.error(err);
+                resetUI();
+            };
+        }
+
+        function disconnect() {
+            if (ws) ws.close();
+        }
+
+        function resetUI() {
+            msgInput.disabled = true;
+            sendBtn.disabled = true;
+            connectBtn.textContent = "Connect to Chat";
+            connectBtn.className = "";
+            connectBtn.onclick = connect;
+        }
+
+        function sendMessage() {
+            const val = msgInput.value.trim();
+            if (val && ws) {
+                ws.send(val);
+                msgInput.value = '';
+            }
+        }
+
+        function handleKey(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+    </script>
+</body>
+</html>
