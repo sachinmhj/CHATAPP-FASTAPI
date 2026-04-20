@@ -58,21 +58,3 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(data={"sub": user.username, "role": user.role.value})
     return {"access_token": token, "token_type": "bearer"}
-
-
-@router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
-    """
-    Protected route — returns the currently authenticated user.
-    Demonstrates that the get_current_user dependency works.
-    """
-    return current_user
-
-
-@router.get("/admin-only", response_model=UserResponse)
-def admin_only_route(current_user: User = Depends(require_role(UserRole.admin))):
-    """
-    Admin-only protected route — demonstrates the RBAC dependency.
-    Returns 403 if the user's role is not 'admin'.
-    """
-    return current_user

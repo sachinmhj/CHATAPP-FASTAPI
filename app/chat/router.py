@@ -10,9 +10,7 @@ from app.auth.utils import decode_access_token
 
 router = APIRouter(tags=["WebSocket Chat"])
 
-# ─── Connection Manager ───────────────────────────────────────────────────────
-# Keeps track of all active WebSocket connections, grouped by room_id.
-# Structure: { room_id: [WebSocket, WebSocket, ...] }
+# ─── Connection Manager ───
 
 class ConnectionManager:
     def __init__(self):
@@ -48,14 +46,11 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-# ─── Helpers ──────────────────────────────────────────────────────────────────
+# ─── Helpers ────
 
 def get_recent_messages(db: Session, room_id: int, limit: int = 20, cursor: Optional[int] = None):
     """
     Cursor-based pagination for message history.
-    Uses message ID as cursor instead of OFFSET — more efficient and stable.
-
-    cursor = last seen message ID (fetch messages BEFORE this ID)
     """
     query = db.query(Message).filter(Message.room_id == room_id)
 
@@ -63,13 +58,13 @@ def get_recent_messages(db: Session, room_id: int, limit: int = 20, cursor: Opti
         query = query.filter(Message.id < cursor)
 
     messages = query.order_by(Message.id.desc()).limit(limit).all()
-    # Return in chronological order (oldest first)
+    # Return oldest first
     messages.reverse()
     return messages
 
 
 def message_to_dict(msg: Message) -> dict:
-    """Serialize a Message ORM object to a JSON-safe dict."""
+    """Serialize a Message object to JSON"""
     return {
         "id": msg.id,
         "content": msg.content,
@@ -80,7 +75,7 @@ def message_to_dict(msg: Message) -> dict:
     }
 
 
-# ─── WebSocket Endpoint ───────────────────────────────────────────────────────
+# ─── WebSocket Endpoint ────
 
 @router.websocket("/ws/{room_id}")
 async def websocket_chat(
@@ -89,26 +84,26 @@ async def websocket_chat(
     token: str = Query(..., description="JWT access token for authentication"),
 ):
     """
-    Protected WebSocket endpoint for real-time chat.
+    WebSocket endpoint for real-time chat.
 
-    Connect with: ws://localhost:8000/ws/{room_id}?token=<jwt_token>
+    Connect with: ws://domain/ws/{room_id}?token={jwt_token}
 
     On connection:
-      - Verifies JWT token → rejects unauthenticated connections (closes with 1008).
+      - Verifies JWT token and rejects unauthenticated connections.
       - Verifies room exists.
-      - Sends last 20 messages (cursor-based) to the newly connected client.
+      - Sends last 20 messages to the newly connected client.
 
     On message:
       - Saves message to PostgreSQL.
       - Broadcasts to all clients in the same room.
 
     On disconnect:
-      - Gracefully removes connection from the room.
+      - Removes connection from the room.
     """
     db: Session = SessionLocal()
 
     try:
-        # ── Step 1: Verify JWT token ─────────────────────────────────────────
+        # Verify JWT token
         payload = decode_access_token(token)
         if payload is None:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
@@ -124,17 +119,17 @@ async def websocket_chat(
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
-        # ── Step 2: Verify room exists ───────────────────────────────────────
+        # Verify room exists
         room = db.query(Room).filter(Room.id == room_id).first()
         if not room:
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
-        # ── Step 3: Accept connection & register ─────────────────────────────
+        # Accept connection & register
         await websocket.accept()
         manager.connect(room_id, websocket)
 
-        # ── Step 4: Send recent message history (cursor-based) ───────────────
+        # Send recent message history (cursor-based)
         recent_messages = get_recent_messages(db, room_id, limit=20)
         await websocket.send_text(json.dumps({
             "type": "history",
@@ -142,13 +137,13 @@ async def websocket_chat(
             "room": {"id": room.id, "name": room.name},
         }))
 
-        # ── Step 5: Notify room of new connection ────────────────────────────
+        # Notify room of new connection
         await manager.broadcast(room_id, {
             "type": "system",
             "message": f"{user.username} joined the room.",
         })
 
-        # ── Step 6: Listen for incoming messages ─────────────────────────────
+        # Listen for incoming messages
         while True:
             data = await websocket.receive_text()
 
@@ -166,21 +161,20 @@ async def websocket_chat(
             db.commit()
             db.refresh(new_message)
 
-            # Broadcast to all clients in the room (including sender)
+            # Broadcast to all clients in the room including sender
             await manager.broadcast(room_id, {
                 "type": "message",
                 **message_to_dict(new_message),
             })
 
     except WebSocketDisconnect:
-        # ── Step 7: Clean up on disconnect ───────────────────────────────────
+        # Clean up on disconnect
         manager.disconnect(room_id, websocket)
         await manager.broadcast(room_id, {
             "type": "system",
             "message": f"{user.username} left the room.",
         })
     except Exception as e:
-        # Catch unexpected errors — close gracefully
         manager.disconnect(room_id, websocket)
     finally:
         db.close()

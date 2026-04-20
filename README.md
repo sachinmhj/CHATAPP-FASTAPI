@@ -58,7 +58,7 @@ Once the server is running, you can access the interactive Swagger documentation
 👉 **[http://localhost:8000/docs](http://localhost:8000/docs)**
 
 ### Key Endpoints:
-- **Auth**: `/auth/signup`, `/auth/login`, `/auth/me`
+- **Auth**: `/auth/signup`, `/auth/login`
 - **Rooms**: `/rooms/` (Create and List rooms)
 - **Chat**: `/ws/{room_id}` (WebSocket real-time chat)
 
