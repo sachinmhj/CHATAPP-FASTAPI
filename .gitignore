@@ -1,34 +1,12 @@
 # Virtual environment
 venv/
-.venv/
-env/
 
-# Environment variables — NEVER commit real secrets
+# Environment variables (Secrets)
 .env
 
 # Python cache
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
-.Python
 
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+# OS (Mac)
 .DS_Store
-Thumbs.db
-
-# Pytest
-.pytest_cache/
-.coverage
-htmlcov/
